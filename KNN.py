@@ -162,6 +162,93 @@ class KNNRegression(KNN):
 
 
 
+class KmeansUpgraded(KNN):
+
+    @classmethod
+    def __updateCentroids(cls, centroid, data) :
+        newCentroids = []
+        for i in range(len(centroid)) :
+            newCentroids.append((centroid[i] + sum([j[i] for j in data]))/(len(data) + 1))
+        return newCentroids
+
+
+    def __getCentroids(data : list, k : int, data_target : list) -> list :
+        centroides = []
+        c_target = []
+        while len(centroides) < k :
+            elt = random.randint(0, len(data))
+            if data[elt] not in centroides and data_target[elt] not in c_target :
+                centroides.append(data[elt])
+                c_target.append(data_target[elt])
+        return centroides, c_target
+
+
+    @classmethod
+    def regression(cls, test_instance : list, k : int = 3, calcType : int = 0, graph : bool = False, clusters : list = None, c_target = None, data_target = None)  -> list :
+        """regression method of the KNN machine learning algorithm
+
+        Args:
+            test_instance (list): dataset, must be a list of : list, tuples
+
+            k (int, optional) : number of clusters in the regression, Defaults to 3
+
+            clusters (list, optional) : argument to give defined clusters to the algorithm, Defaults to None
+
+            calcType (int, optional) : way of calculation of the distances in the algorithm -> 0 = euclidian distance, 1 = manhattan distance, 2 = chebyshev distance, Defaults to 0
+
+            graph (bool, optional) : creation of a matplotlib graph if the dimension of the data <= 2, Defaults to False
+
+        Returns:
+            list: returns the list of the positions of each cluster center
+        """
+
+        assert not(len(test_instance[0]) > 2 and graph == True), "Impossible de générer un graph de dimension supérieure à 2"
+
+        #initialisation des clusters
+        centroides, c_target = cls.__getCentroids(test_instance, k, ) if clusters == None else clusters, c_target
+        centroidesWeights = [[] for _ in range(k)]
+        variant = 0
+
+        error_coef = len(test_instance)/10
+        error = 0
+        error_list = []
+
+        for points in test_instance : 
+            if graph == True : 
+                plt.scatter(points[0], points[1], c= 'b')
+            #calcul de la distance entre le point et les clusters
+            match calcType:
+                case 0: 
+                   distances = [(cls.calcDistEuclide(centr, points), centr) for centr in centroides]
+                case 1: 
+                    distances = [(cls.calcDistManhattan(centr, points), centr) for centr in centroides]
+                case 2: 
+                    distances = [(cls.calcDistChebishev(centr, points), centr) for centr in centroides]
+                case _ : 
+                    raise ValueError("Type de calcul inconnu")
+            #recherche du cluster le plus proche et mise à jour de son centre moyen
+            distances.sort(key=lambda x: x[0])
+            print(c_target[centroides.index(distances[0][1])], " | " ,data_target[variant] )
+            if c_target[centroides.index(distances[0][1])] == data_target[variant]:
+                pass
+            else : 
+                loc = c_target.index(data_target[variant])
+                centroidesWeights[loc].append(points)
+                centroides[loc] = cls.__updateCentroids(centroides[loc], centroidesWeights[loc])
+                error += 1
+            variant += 1
+            if variant%error_coef ==0 :
+                error_list.append((error, variant))
+                error = 0
+
+        if graph == True : 
+            for centr in centroides :
+                plt.scatter(centr[0], centr[1], c= 'r')
+            plt.plot()
+            plt.show()
+        return centroides, error_list
+
+
 
 if __name__ == "__main__":
 
@@ -169,7 +256,7 @@ if __name__ == "__main__":
     #le plus proche de chaque nouveau chiffre donné
 
     #taille du jeu de données utilisé pour entrainer le modèle
-    IMAGE_NUMBER = 1000
+    IMAGE_NUMBER = 3000
     #taille du jeu de données utilisé pour tester le modèle
     TRAINING_SET_SIZE = 1000
 
@@ -197,6 +284,9 @@ if __name__ == "__main__":
     listeArray = []
     for arrays in x[:IMAGE_NUMBER] : 
         listeArray.append(arrays.tolist())
+    listeTarget = []
+    for target in y[:IMAGE_NUMBER] :
+        listeTarget.append(int(target))
 
     testArray = []
     for arrays in x[IMAGE_NUMBER:(IMAGE_NUMBER+TRAINING_SET_SIZE)] : 
@@ -213,12 +303,17 @@ if __name__ == "__main__":
 
 
     #application de la régression
-    clusters = KNNRegression.regression(listeArray[:IMAGE_NUMBER], k = 10, clusters= clusters)
+    clusters, error_list = KmeansUpgraded.regression(listeArray[:IMAGE_NUMBER], k = 10, clusters= clusters, c_target=nums, data_target= listeTarget)
+    #clusters = KNNRegression.regression(listeArray[:IMAGE_NUMBER], k = 10, clusters= clusters)
 
     #chiffrage de la précision
     print(f"précision du modèle : {getAccuracy(clusters, nums, testArray, y[IMAGE_NUMBER:(IMAGE_NUMBER+TRAINING_SET_SIZE)])} %")
     print(f"nombre d'images traitées pour entrainer le modèle : {IMAGE_NUMBER}")
     print(f"nombre d'images traitées pour tester le modèle : {TRAINING_SET_SIZE}")
+
+    plt.scatter([x[1] for x in error_list], [x[0] for x in error_list], c= 'r')
+    plt.plot()
+    plt.show()
 
 
 
